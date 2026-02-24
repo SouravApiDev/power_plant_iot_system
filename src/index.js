@@ -74,7 +74,7 @@ export class PlantState {
       generator: {
         powerOutput: 1000,
         voltage: 25000,
-        frequency: 60,
+        frequency: 50,
         efficiency: 95
       },
       cooling: {
@@ -117,6 +117,7 @@ export class PlantState {
       const tempFactor = Math.min(1, (state.reactor.temperature - 250) / 200);
       state.generator.powerOutput = Math.round(tempFactor * state.turbine.speed * 0.6);
       state.generator.voltage = 24000 + state.generator.powerOutput * 2;
+      state.generator.frequency = 49.5 + Math.random() * 1 + (tempFactor * 0.5);
       state.generator.efficiency = Math.min(98, 85 + tempFactor * 10);
       
       // Cooling system
@@ -662,7 +663,7 @@ function getDashboardHTML() {
       <h2>⚡ GENERATOR</h2>
       <div class="metric"><span class="metric-label">Power Output:</span><span class="metric-value" id="powerOutput">1000 MW</span></div>
       <div class="metric"><span class="metric-label">Voltage:</span><span class="metric-value" id="voltage">25000 V</span></div>
-      <div class="metric"><span class="metric-label">Frequency:</span><span class="metric-value" id="frequency">60 Hz</span></div>
+      <div class="metric"><span class="metric-label">Frequency:</span><span class="metric-value" id="frequency">50.00 Hz</span></div>
       <div class="metric"><span class="metric-label">Efficiency:</span><span class="metric-value" id="efficiency">95%</span></div>
     </div>
 
@@ -764,7 +765,7 @@ function getDashboardHTML() {
       // Generator
       document.getElementById('powerOutput').textContent = data.generator.powerOutput + ' MW';
       document.getElementById('voltage').textContent = data.generator.voltage + ' V';
-      document.getElementById('frequency').textContent = data.generator.frequency + ' Hz';
+      document.getElementById('frequency').textContent = data.generator.frequency.toFixed(2) + ' Hz';
       document.getElementById('efficiency').textContent = data.generator.efficiency.toFixed(1) + '%';
 
       // Cooling
