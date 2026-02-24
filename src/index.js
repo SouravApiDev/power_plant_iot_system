@@ -75,7 +75,8 @@ export class PlantState {
         powerOutput: 1000,
         voltage: 25000,
         frequency: 50,
-        efficiency: 95
+        efficiency: 95,
+        load: 70
       },
       cooling: {
         primaryTemp: 290,
@@ -115,10 +116,11 @@ export class PlantState {
       
       // Generator simulation
       const tempFactor = Math.min(1, (state.reactor.temperature - 250) / 200);
-      state.generator.powerOutput = Math.round(tempFactor * state.turbine.speed * 0.6);
+      const loadFactor = state.generator.load / 100;
+      state.generator.powerOutput = Math.round(tempFactor * state.turbine.speed * 0.6 * loadFactor);
       state.generator.voltage = 24000 + state.generator.powerOutput * 2;
-      state.generator.frequency = 49.5 + Math.random() * 1 + (tempFactor * 0.5);
-      state.generator.efficiency = Math.min(98, 85 + tempFactor * 10);
+      state.generator.frequency = 50 - (loadFactor * 0.5) + Math.random() * 0.5;
+      state.generator.efficiency = Math.min(98, 85 + tempFactor * 10 - (Math.abs(loadFactor - 0.8) * 5));
       
       // Cooling system
       const coolingEfficiency = state.cooling.flowRate / 15000;
@@ -176,7 +178,16 @@ export class PlantState {
         temp: Math.round(state.reactor.temperature),
         power: state.generator.powerOutput,
         turbineSpeed: state.turbine.speed,
-        pressure: Math.round(state.reactor.pressure)
+        pressure: Math.round(state.reactor.pressure),
+        voltage: state.generator.voltage,
+        frequency: state.generator.frequency,
+        efficiency: state.generator.efficiency,
+        coolingPrimary: state.cooling.primaryTemp,
+        coolingSecondary: state.cooling.secondaryTemp,
+        flowRate: state.cooling.flowRate,
+        vibration: state.turbine.vibration,
+        radiation: state.safety.radiationLevel,
+        load: state.generator.load
       });
       if (state.history.length > 100) state.history.shift();
       
@@ -200,6 +211,9 @@ export class PlantState {
     }
     if (data.flowRate !== undefined) {
       state.cooling.flowRate = Math.max(5000, Math.min(25000, data.flowRate));
+    }
+    if (data.generatorLoad !== undefined) {
+      state.generator.load = Math.max(0, Math.min(100, data.generatorLoad));
     }
     if (data.autoShutdown !== undefined) {
       state.safety.autoShutdown = data.autoShutdown;
@@ -641,6 +655,10 @@ function getDashboardHTML() {
       <input type="range" id="flowRate" min="5000" max="25000" value="15000" step="1000">
     </div>
     <div class="control-group">
+      <label>Generator Load: <span id="loadValue" style="color: #00c8ff; font-family: 'Orbitron', sans-serif;">70</span>%</label>
+      <input type="range" id="generatorLoad" min="0" max="100" value="70">
+    </div>
+    <div class="control-group">
       <label><input type="checkbox" id="autoShutdown" checked> Auto Safety Shutdown System</label>
     </div>
     <div>
@@ -662,6 +680,7 @@ function getDashboardHTML() {
     <div class="card">
       <h2>⚡ GENERATOR</h2>
       <div class="metric"><span class="metric-label">Power Output:</span><span class="metric-value" id="powerOutput">1000 MW</span></div>
+      <div class="metric"><span class="metric-label">Load:</span><span class="metric-value" id="generatorLoadDisplay">70%</span></div>
       <div class="metric"><span class="metric-label">Voltage:</span><span class="metric-value" id="voltage">25000 V</span></div>
       <div class="metric"><span class="metric-label">Frequency:</span><span class="metric-value" id="frequency">50.00 Hz</span></div>
       <div class="metric"><span class="metric-label">Efficiency:</span><span class="metric-value" id="efficiency">95%</span></div>
@@ -695,6 +714,9 @@ function getDashboardHTML() {
     <h2>📊 LIVE PERFORMANCE GRAPHS</h2>
     <div class="chart-container"><canvas id="tempChart"></canvas></div>
     <div class="chart-container"><canvas id="powerChart"></canvas></div>
+    <div class="chart-container"><canvas id="generatorChart"></canvas></div>
+    <div class="chart-container"><canvas id="coolingChart"></canvas></div>
+    <div class="chart-container"><canvas id="safetyChart"></canvas></div>
   </div>
   
   </div>
@@ -746,6 +768,7 @@ function getDashboardHTML() {
       // Update sliders from server (multi-user sync)
       const controlRodsSlider = document.getElementById('controlRods');
       const flowRateSlider = document.getElementById('flowRate');
+      const generatorLoadSlider = document.getElementById('generatorLoad');
       const autoShutdownCheckbox = document.getElementById('autoShutdown');
       
       if (controlRodsSlider.value != data.reactor.controlRods) {
@@ -758,12 +781,18 @@ function getDashboardHTML() {
         document.getElementById('flowValue').textContent = data.cooling.flowRate;
       }
       
+      if (generatorLoadSlider.value != data.generator.load) {
+        generatorLoadSlider.value = data.generator.load;
+        document.getElementById('loadValue').textContent = data.generator.load;
+      }
+      
       if (autoShutdownCheckbox.checked !== data.safety.autoShutdown) {
         autoShutdownCheckbox.checked = data.safety.autoShutdown;
       }
 
       // Generator
       document.getElementById('powerOutput').textContent = data.generator.powerOutput + ' MW';
+      document.getElementById('generatorLoadDisplay').textContent = data.generator.load + '%';
       document.getElementById('voltage').textContent = data.generator.voltage + ' V';
       document.getElementById('frequency').textContent = data.generator.frequency.toFixed(2) + ' Hz';
       document.getElementById('efficiency').textContent = data.generator.efficiency.toFixed(1) + '%';
@@ -811,6 +840,15 @@ function getDashboardHTML() {
       powerData = history.map(h => h.power);
       turbineData = history.map(h => h.turbineSpeed);
       pressureData = history.map(h => h.pressure);
+      const voltageData = history.map(h => h.voltage / 1000);
+      const frequencyData = history.map(h => h.frequency);
+      const efficiencyData = history.map(h => h.efficiency);
+      const loadData = history.map(h => h.load);
+      const coolingPrimaryData = history.map(h => h.coolingPrimary);
+      const coolingSecondaryData = history.map(h => h.coolingSecondary);
+      const flowRateData = history.map(h => h.flowRate / 1000);
+      const vibrationData = history.map(h => h.vibration);
+      const radiationData = history.map(h => h.radiation);
       
       drawChart('tempChart', [
         { label: 'Temperature (°C)', data: tempData, color: '#ff6384' },
@@ -819,7 +857,25 @@ function getDashboardHTML() {
       
       drawChart('powerChart', [
         { label: 'Power (MW)', data: powerData, color: '#00ff88' },
-        { label: 'Turbine Speed (RPM)', data: turbineData.map(v => v/10), color: '#ffce56' }
+        { label: 'Turbine Speed (RPM/10)', data: turbineData.map(v => v/10), color: '#ffce56' }
+      ]);
+      
+      drawChart('generatorChart', [
+        { label: 'Voltage (kV)', data: voltageData, color: '#00c8ff' },
+        { label: 'Frequency (Hz)', data: frequencyData, color: '#ff6384' },
+        { label: 'Efficiency (%)', data: efficiencyData, color: '#00ff88' },
+        { label: 'Load (%)', data: loadData, color: '#ffa500' }
+      ]);
+      
+      drawChart('coolingChart', [
+        { label: 'Primary Temp (°C)', data: coolingPrimaryData, color: '#ff6384' },
+        { label: 'Secondary Temp (°C)', data: coolingSecondaryData, color: '#36a2eb' },
+        { label: 'Flow Rate (k L/min)', data: flowRateData, color: '#00c8ff' }
+      ]);
+      
+      drawChart('safetyChart', [
+        { label: 'Vibration (mm/s)', data: vibrationData, color: '#ffa500' },
+        { label: 'Radiation (mSv/h)', data: radiationData, color: '#ff4444' }
       ]);
     }
 
@@ -875,6 +931,13 @@ function getDashboardHTML() {
       document.getElementById('flowValue').textContent = e.target.value;
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ flowRate: parseInt(e.target.value) }));
+      }
+    });
+
+    document.getElementById('generatorLoad').addEventListener('input', (e) => {
+      document.getElementById('loadValue').textContent = e.target.value;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ generatorLoad: parseInt(e.target.value) }));
       }
     });
 
