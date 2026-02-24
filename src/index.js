@@ -742,6 +742,25 @@ function getDashboardHTML() {
       document.getElementById('fuelLevel').textContent = data.reactor.fuelLevel.toFixed(2) + '%';
       updateStatus('reactorStatus', data.reactor.status);
 
+      // Update sliders from server (multi-user sync)
+      const controlRodsSlider = document.getElementById('controlRods');
+      const flowRateSlider = document.getElementById('flowRate');
+      const autoShutdownCheckbox = document.getElementById('autoShutdown');
+      
+      if (controlRodsSlider.value != data.reactor.controlRods) {
+        controlRodsSlider.value = data.reactor.controlRods;
+        document.getElementById('rodValue').textContent = data.reactor.controlRods;
+      }
+      
+      if (flowRateSlider.value != data.cooling.flowRate) {
+        flowRateSlider.value = data.cooling.flowRate;
+        document.getElementById('flowValue').textContent = data.cooling.flowRate;
+      }
+      
+      if (autoShutdownCheckbox.checked !== data.safety.autoShutdown) {
+        autoShutdownCheckbox.checked = data.safety.autoShutdown;
+      }
+
       // Generator
       document.getElementById('powerOutput').textContent = data.generator.powerOutput + ' MW';
       document.getElementById('voltage').textContent = data.generator.voltage + ' V';
