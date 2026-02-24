@@ -45,6 +45,11 @@ export class PlantState {
     if (!state) {
       state = this.getInitialState();
       await this.state.storage.put('plantState', state);
+    }
+    
+    // Always ensure simulation is running
+    if (!this.simulationRunning) {
+      this.simulationRunning = true;
       this.startSimulation();
     }
     
