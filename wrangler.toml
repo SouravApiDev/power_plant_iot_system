@@ -10,8 +10,3 @@ bindings = [
 [[migrations]]
 tag = "v1"
 new_classes = ["PlantState"]
-
-[[d1_databases]]
-binding = "DB"
-database_name = "nuclear_plant_db"
-database_id = "__D1_ID__"

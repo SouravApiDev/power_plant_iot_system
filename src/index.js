@@ -34,22 +34,6 @@ export class PlantState {
       });
     }
     
-    if (url.pathname === '/api/history') {
-      try {
-        const { results } = await this.env.DB.prepare(
-          'SELECT * FROM plant_history ORDER BY timestamp DESC LIMIT 1000'
-        ).all();
-        return new Response(JSON.stringify(results), {
-          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-        });
-      } catch (e) {
-        return new Response(JSON.stringify({ error: e.message }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-        });
-      }
-    }
-    
     return new Response('Not found', { status: 404 });
   }
 
@@ -194,22 +178,6 @@ export class PlantState {
         pressure: Math.round(state.reactor.pressure)
       });
       if (state.history.length > 100) state.history.shift();
-      
-      // Save to D1 database every 10 seconds
-      if (!this.lastDbSave || Date.now() - this.lastDbSave > 10000) {
-        this.lastDbSave = Date.now();
-        try {
-          await this.env.DB.prepare(
-            'INSERT INTO plant_history (timestamp, reactor_temp, reactor_pressure, power_output, turbine_speed) VALUES (?, ?, ?, ?, ?)'
-          ).bind(
-            state.timestamp,
-            state.reactor.temperature,
-            state.reactor.pressure,
-            state.generator.powerOutput,
-            state.turbine.speed
-          ).run();
-        } catch (e) {}
-      }
       
       await this.state.storage.put('plantState', state);
       
